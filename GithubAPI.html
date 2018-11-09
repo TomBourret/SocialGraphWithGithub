@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+
+<html>
+    <head>
+        <title>GitHub API Visualisation</title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width">
+        <!--<link rel="stylesheet" href="style.css" />-->
+        <script src="https://code.jquery.com/jquery.min.js"></script>
+    </head>
+    <body>
+		<textarea id='GHusername' rows="1">TomBourret</textarea>
+        <button onclick="tirage()">Appeler l'API sur cet utilisateur</button>
+        <div id='userDatas' style="width:450px;">
+            <span>Entrez un login existant</span>
+        </div>
+
+        <script>
+			function dumpResponse() {
+			  //console.log(this.responseText);
+				$('#userDatas').html(this.responseText);
+			}
+
+            function tirage() {
+				// Create a new request object
+				var request = new XMLHttpRequest();
+				
+				request.onload = dumpResponse;
+				// Initialize a request
+				console.log(document.getElementById("GHusername").value);
+				request.open('get', 'https://api.github.com/users/' + document.getElementById("GHusername").value);
+				// Send it
+				request.send();
+
+			}
+            
+        </script>
+        
+    </body>
+</html>
+
