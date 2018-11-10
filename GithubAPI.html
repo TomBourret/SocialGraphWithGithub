@@ -9,26 +9,44 @@
         <script src="https://code.jquery.com/jquery.min.js"></script>
     </head>
     <body>
-		<textarea id='GHusername' rows="1">TomBourret</textarea>
-        <button onclick="tirage()">Appeler l'API sur cet utilisateur</button>
-        <div id='userDatas' style="width:450px;">
-            <span>Entrez un login existant</span>
+		<h1> Authenticate and retrieve datas</h1>
+		<form>
+			Username<br>
+			<input type="text" id="formUsername">
+			<br>
+			Password<br>
+			<input type="password" id="formPassword">
+			<input type="button" id="authenticateSubmit" value="Authenticate">
+		</form>
+		
+		<h2>Just retrieve public datas</h2>
+		Username<br>
+		<input type="text" id='GHusername' rows="1">
+        <button onclick="askGitHubAPI()">Call the API with this username</button>
+        
+		<h3>Results appear here</h3>
+		<div id='userDatas' style="width:450px;">
+            <span>Enter an existing username</span>
         </div>
 
         <script>
+		
 			function dumpResponse() {
-				//console.log(this.responseText);
+				$('#userDatas').html(createTableFromJson(this.responseText));
+			}
+
+			function createTableFromJson(jsonString) {
 				var dataTable = '<table><tr><th>Key</th><th>Value</th>';
-				var datas = JSON.parse(this.responseText);
+				var datas = JSON.parse(jsonString);
 				for (var key in datas){
 					var value = datas[key];
 					dataTable += '<tr><th>' + key + '</th><th>' + value + '</th></tr>';
 				}
 				dataTable += '</table>';
-				$('#userDatas').html(dataTable);
+				return dataTable;
 			}
-
-            function tirage() {
+			
+            function askGitHubAPI() {
 				// Create a new request object
 				var request = new XMLHttpRequest();
 				
@@ -40,7 +58,27 @@
 				request.send();
 
 			}
-            
+			
+			$('#authenticateSubmit').click(function(){
+				var usernameAndPassword = $("#formUsername").val() + ":" + $("#formPassword").val();
+				$.ajax({
+					url: "https://api.github.com/user",
+					beforeSend: function(xhr) { 
+					  xhr.setRequestHeader("Authorization", "Basic " + btoa(usernameAndPassword)); 
+					},
+					type: 'GET',
+					dataType: 'json',
+					contentType: 'application/json',
+					success: function (data) {
+						console.log(data);
+					  $('#userDatas').html(createTableFromJson(JSON.stringify(data)));
+					},
+					error: function(){
+					  $('#userDatas').html("Your identifiers are uncorrect");
+					}
+				});
+			});
+			console.log("Script loaded");
         </script>
         
     </body>
