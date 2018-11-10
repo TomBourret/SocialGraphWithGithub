@@ -40,10 +40,19 @@
 				var datas = JSON.parse(jsonString);
 				for (var key in datas){
 					var value = datas[key];
-					dataTable += '<tr><th>' + key + '</th><th>' + value + '</th></tr>';
+					dataTable += '<tr><th>' + key + '</th><th>' + transformStringToHyperlink(value) + '</th></tr>';
 				}
 				dataTable += '</table>';
 				return dataTable;
+			}
+			
+			function transformStringToHyperlink(stringToHyperlink) {
+				if(String(stringToHyperlink).startsWith("https://")){
+					return ('<a href="' + stringToHyperlink + '" target="_blank">' + stringToHyperlink + '</a>');
+				}
+				else {
+					return stringToHyperlink;
+				}
 			}
 			
             function askGitHubAPI() {
@@ -52,7 +61,6 @@
 				
 				request.onload = dumpResponse;
 				// Initialize a request
-				console.log(document.getElementById("GHusername").value);
 				request.open('get', 'https://api.github.com/users/' + document.getElementById("GHusername").value);
 				// Send it
 				request.send();
@@ -70,7 +78,6 @@
 					dataType: 'json',
 					contentType: 'application/json',
 					success: function (data) {
-						console.log(data);
 					  $('#userDatas').html(createTableFromJson(JSON.stringify(data)));
 					},
 					error: function(){
@@ -78,7 +85,6 @@
 					}
 				});
 			});
-			console.log("Script loaded");
         </script>
         
     </body>
