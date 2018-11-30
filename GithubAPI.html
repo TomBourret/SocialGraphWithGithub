@@ -22,19 +22,267 @@
 		<h2>Just retrieve public datas</h2>
 		Username<br>
 		<input type="text" id='GHusername' rows="1">
-        <button onclick="askGitHubAPI()">Call the API with this username</button>
+        <button onclick="askGitHubAPIOnUsername()">Call the API with this username</button>
         
 		<h3>Results appear here</h3>
 		<div id='userDatas' style="width:450px;">
             <span>Enter an existing username</span>
         </div>
-
+		<div id="graph">
+		<canvas width="960" height="600"></canvas>
+		
+        
+    </body>
+</html>
+<script src="https://d3js.org/d3.v5.min.js"></script>
         <script>
 		
-			function dumpResponse() {
-				$('#userDatas').html(createTableFromJson(this.responseText));
+			var canvas = document.querySelector("canvas"),
+				context = canvas.getContext("2d"),
+				width = canvas.width,
+				height = canvas.height;
+				
+			var color = d3.scaleOrdinal(d3.schemeCategory10);
+
+			var simulation = d3.forceSimulation()
+				.force("link", d3.forceLink().id(function(d) { return d.id; }))
+				.force("charge", d3.forceManyBody())
+				.force("center", d3.forceCenter(width / 2, height / 2));
+	
+			var githubGraph =
+			{"nodes": [],
+			"links": []
+			};
+   
+			var githubDatas = 
+			{ "responses": []
+			};
+			
+			<!-- 0 = user; 1 = repo; 2 = org -->
+			var typeOfObject = 0;
+			
+			var firstUser = true;
+			
+			<!-- var elem = new Object(); -->
+			<!-- elem.id = "Tom"; -->
+			<!-- elem.group = 1; -->
+			<!-- githubGraph.nodes.push(elem); -->
+			<!-- console.log(JSON.stringify(githubGraph)); -->
+
+			function dumpResponse(data) {
+				var APIresult = data;
+				githubDatas.responses.push(data);
+				<!-- console.log(JSON.stringify(githubDatas.responses[0])); -->
+				//$('#userDatas').html(createTableFromJson(JSON.stringify(APIresult)));
+				
+				if (typeOfObject === 0)
+				{
+					createNode(APIresult.login, 0);
+					var source = APIresult.login;
+					<!-- typeOfObject = 1; -->
+					console.log(APIresult.repos_url);
+					askGitHubAPIFromLink(APIresult.repos_url).then((reposResult) => {
+						handleReposResults(reposResult, source);
+						<!-- typeOfObject = 2; -->
+						askGitHubAPIFromLink(APIresult.organizations_url).then((orgsResult) => {
+							handleOrgsResults(orgsResult, source);
+							console.log(JSON.stringify(githubGraph));
+							drawGraph();
+						});
+					});
+				}
 			}
 
+			function handleUsersResults(APIresult, source)
+			{
+				for(var i = 0; i < APIresult.length; i++)
+				{
+					createNode(APIresult[i].login, 0);
+					createLink(source, APIresult[i].login);
+				}
+			}
+			
+			function handleReposResults(APIresult, source)
+			{
+				for(var i = 0; i < APIresult.length; i++)
+				{
+					createNode(APIresult[i].name, 1);
+					createLink(source, APIresult[i].name);
+				}
+				
+				for(var i = 0; i < APIresult.length; i++)
+				{
+					var url = APIresult[i].contributors_url;
+					//console.log("URL de collabo :" + url.substring(0, url.indexOf('{')));
+					askGitHubAPIFromLink(url).then((userResult) => {
+						handleUsersResults(userResult, APIresult[i].name);
+					});
+				}	
+			}
+			
+			function handleOrgsResults(APIresult, source)
+			{
+				for(var i = 0; i < APIresult.length; i++)
+				{
+					createNode(APIresult[i].login, 2);
+					createLink(source, APIresult[i].login);
+				}
+			}
+			
+            function askGitHubAPIOnUsername() {
+				// Create a new request object
+				var request = new XMLHttpRequest();
+				
+				request.onload = dumpResponse;
+				// Initialize a request
+				request.open('get', 'https://api.github.com/users/' + document.getElementById("GHusername").value);
+				// Send it
+				request.send();
+
+			}
+			
+			function askGitHubAPIFromLink(linkString) {
+				return new Promise((resolve, reject) => {
+				// Create a new request object
+					<!-- var request = new XMLHttpRequest(); -->
+					
+					
+					<!-- // Initialize a request -->
+					<!-- request.open('get', linkString); -->
+					
+					<!-- request.onload = () => resolve(request.responseText); -->
+					<!-- request.onerror = () => reject(request.statusText); -->
+					<!-- // Send it -->
+					<!-- request.send(); -->
+					
+					var usernameAndPassword = $("#formUsername").val() + ":" + $("#formPassword").val();
+					console.log(linkString);
+					$.ajax({
+						url: linkString,
+						beforeSend: function(xhr) { 
+						  xhr.setRequestHeader("Authorization", "Basic " + btoa(usernameAndPassword)); 
+						},
+						type: 'GET',
+						dataType: 'json',
+						contentType: 'application/json',
+						success: function (data) {
+						  //alert(JSON.stringify(data));
+						  resolve(data);
+						},
+						error: function(){
+						  alert("Erreur avec cette url :" + linkString);
+						  reject("error");
+						}
+					});
+				});
+
+			}
+			
+			function createNode(idString, group)
+			{
+				var node = new Object();
+				node.id = idString;
+				node.group = group;
+				githubGraph.nodes.push(node);
+			}
+			
+			function createLink(sourceString, targetString)
+			{
+				var link = new Object();
+				link.source = sourceString;
+				link.target = targetString;
+				link.value = 1;
+				githubGraph.links.push(link);
+			}
+			
+			function drawGraph()
+			{
+				simulation
+					.nodes(githubGraph.nodes)
+					.on("tick", ticked);
+
+				simulation.force("link")
+					.links(githubGraph.links);
+
+				d3.select(canvas)
+					.call(d3.drag()
+						.container(canvas)
+						.subject(dragsubject)
+						.on("start", dragstarted)
+						.on("drag", dragged)
+						.on("end", dragended));
+
+				function ticked() {
+					context.clearRect(0, 0, width, height);
+										
+					context.beginPath();
+					githubGraph.links.forEach(drawLink);
+					context.strokeStyle = "#ccc";
+					context.stroke();
+					
+					githubGraph.nodes.forEach(drawNode);
+				}
+
+				function dragsubject() {
+					return simulation.find(d3.event.x, d3.event.y);
+				}
+			}
+			
+			function dragstarted() {
+				if (!d3.event.active) simulation.alphaTarget(0.3).restart();
+				d3.event.subject.fx = d3.event.subject.x;
+				d3.event.subject.fy = d3.event.subject.y;
+			}
+
+			function dragged() {
+				d3.event.subject.fx = d3.event.x;
+				d3.event.subject.fy = d3.event.y;
+			}
+
+			function dragended() {
+				if (!d3.event.active) simulation.alphaTarget(0);
+				d3.event.subject.fx = null;
+				d3.event.subject.fy = null;
+			}
+
+			function drawLink(d) {
+				context.moveTo(d.source.x, d.source.y);
+				context.lineTo(d.target.x, d.target.y);
+			}
+
+			function drawNode(d) {
+				context.beginPath();
+				context.moveTo(d.x + 3, d.y);
+				context.arc(d.x, d.y, 3, 0, 2 * Math.PI);
+				context.fillStyle = color(d.group);
+				context.strokeStyle = color(d.group);
+				context.fill();
+				context.stroke();
+			}
+
+			$('#authenticateSubmit').click(function(){
+				var usernameAndPassword = $("#formUsername").val() + ":" + $("#formPassword").val();
+				$.ajax({
+					url: "https://api.github.com/users/mbostock",
+					beforeSend: function(xhr) { 
+					  xhr.setRequestHeader("Authorization", "Basic " + btoa(usernameAndPassword)); 
+					},
+					type: 'GET',
+					dataType: 'json',
+					contentType: 'application/json',
+					success: function (data) {
+					  //alert(JSON.stringify(data));
+					  dumpResponse(data);
+					},
+					error: function(){
+					  alert("error");
+					  $('#userDatas').html("Your identifiers are uncorrect");
+					}
+				});
+			});
+			
+			
+			
 			function createTableFromJson(jsonString) {
 				var dataTable = '<table><tr><th>Key</th><th>Value</th>';
 				var datas = JSON.parse(jsonString);
@@ -55,38 +303,5 @@
 				}
 			}
 			
-            function askGitHubAPI() {
-				// Create a new request object
-				var request = new XMLHttpRequest();
-				
-				request.onload = dumpResponse;
-				// Initialize a request
-				request.open('get', 'https://api.github.com/users/' + document.getElementById("GHusername").value);
-				// Send it
-				request.send();
-
-			}
-			
-			$('#authenticateSubmit').click(function(){
-				var usernameAndPassword = $("#formUsername").val() + ":" + $("#formPassword").val();
-				$.ajax({
-					url: "https://api.github.com/user",
-					beforeSend: function(xhr) { 
-					  xhr.setRequestHeader("Authorization", "Basic " + btoa(usernameAndPassword)); 
-					},
-					type: 'GET',
-					dataType: 'json',
-					contentType: 'application/json',
-					success: function (data) {
-					  $('#userDatas').html(createTableFromJson(JSON.stringify(data)));
-					},
-					error: function(){
-					  $('#userDatas').html("Your identifiers are uncorrect");
-					}
-				});
-			});
         </script>
-        
-    </body>
-</html>
 
